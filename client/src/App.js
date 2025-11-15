@@ -1,68 +1,128 @@
-import React, { useState, useEffect } from 'react';
+// client/src/App.js
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import './App.css';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'https://YOUR_RENDER_URL';
+const API_BASE = process.env.REACT_APP_API_BASE || 'https://cg-songs.onrender.com';
 
-function App() {
+// Replace these with the actual channel IDs you want (or leave blank)
+const AVAILABLE_CHANNELS = [
+  // Example: 'UCxxxxxxxxxxxxxxxxx1',
+  // 'UCxxxxxxxxxxxxxxxxx2'
+];
+
+export default function App() {
   const [q, setQ] = useState('Chhattisgarhi song');
   const [items, setItems] = useState([]);
   const [pageToken, setPageToken] = useState('');
-  const [selected, setSelected] = useState(null);
-  const [selectedMeta, setSelectedMeta] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [allowedChannels, setAllowedChannels] = useState(AVAILABLE_CHANNELS);
+  const [suggestions, setSuggestions] = useState([]);
+  const searchTimeout = useRef(null);
 
-  useEffect(() => { fetchSearch(); }, []);
+  useEffect(() => {
+    fetchSearch();
+    // eslint-disable-next-line
+  }, []);
 
-  async function fetchSearch(pt='') {
+  async function fetchSearch(pt = '') {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE}/api/search`, { params: { q, pageToken: pt }});
+      const channelsParam = allowedChannels.join(',');
+      const res = await axios.get(`${API_BASE}/api/search`, {
+        params: { q, pageToken: pt, maxResults: 12, channels: channelsParam }
+      });
       const data = res.data;
+      // data.items is filtered videos (full video resources)
       setItems(data.items || []);
-      setPageToken(data.nextPageToken || '');
+      setPageToken((data.originalSearch && data.originalSearch.nextPageToken) || '');
     } catch (e) {
       console.error(e);
-      alert('Search failed. Check console.');
-    } finally { setLoading(false); }
+      alert('Search failed — check console.');
+    } finally {
+      setLoading(false);
+    }
   }
+
+  function handleSearchChange(v) {
+    setQ(v);
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => fetchSearch(), 450);
+  }
+
+  function toggleChannel(chId) {
+    setAllowedChannels(prev => {
+      if (prev.includes(chId)) return prev.filter(x => x !== chId);
+      return [...prev, chId];
+    });
+  }
+
+  useEffect(() => {
+    // re-fetch when allowedChannels changes
+    fetchSearch();
+    // eslint-disable-next-line
+  }, [allowedChannels]);
 
   async function openVideo(videoId) {
     try {
-      const res = await axios.get(`${API_BASE}/api/videos`, { params: { ids: videoId }});
-      const item = res.data.items && res.data.items[0];
-      if (item && item.status && item.status.embeddable) {
-        setSelected(videoId);
-        setSelectedMeta(item);
-      } else {
-        window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
-      }
+      // we already have video details from search result (items contain full video resource)
+      setSelectedVideo(items.find(it => it.id === videoId) || null);
     } catch (e) {
       console.error(e);
-      alert('Failed to get video details.');
+      alert('Failed to open video');
     }
   }
 
   return (
     <div className="container">
-      <header>
+      <header className="topbar">
         <h1>Chhattisgarh Songs</h1>
         <div className="searchRow">
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search songs, artist..." />
+          <input value={q} onChange={e => handleSearchChange(e.target.value)} placeholder="Search songs, artist..." />
           <button onClick={() => fetchSearch()}>Search</button>
         </div>
       </header>
 
-      {loading ? <p>Loading...</p> : (
+      <div className="controls">
+        <div className="channels">
+          <strong>Channels:</strong>
+          {AVAILABLE_CHANNELS.length === 0 ? (
+            <span className="hint"> (No channel preselected. Add channel IDs in code or use UI to paste.)</span>
+          ) : AVAILABLE_CHANNELS.map(ch => (
+            <label key={ch} className={`chip ${allowedChannels.includes(ch) ? 'active' : ''}`}>
+              <input type="checkbox" checked={allowedChannels.includes(ch)} onChange={() => toggleChannel(ch)} />
+              {ch}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="grid">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div className="card placeholder" key={i}>
+              <div className="thumb placeholderBox" />
+              <div className="meta">
+                <div className="title placeholderBox short" />
+                <div className="channel placeholderBox tiny" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="grid">
           {items.map(it => {
-            const vid = it.id && (it.id.videoId || it.id);
-            const thumb = it.snippet?.thumbnails?.medium?.url || it.snippet?.thumbnails?.default?.url;
+            const v = it;
+            const vid = v.id;
+            const snippet = v.snippet || {};
+            const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url;
             return (
               <div className="card" key={vid}>
-                <img src={thumb} alt={it.snippet?.title} onClick={() => openVideo(vid)} />
+                <img loading="lazy" src={thumb} alt={snippet.title} onClick={() => openVideo(vid)} />
                 <div className="meta">
-                  <div className="title" title={it.snippet?.title}>{it.snippet?.title}</div>
-                  <div className="channel">{it.snippet?.channelTitle}</div>
+                  <div className="title" title={snippet.title}>{snippet.title}</div>
+                  <div className="channel">{snippet.channelTitle}</div>
                 </div>
               </div>
             );
@@ -70,28 +130,27 @@ function App() {
         </div>
       )}
 
-      {pageToken && <div className="pager"><button onClick={()=>fetchSearch(pageToken)}>Next Page</button></div>}
+      {pageToken && <div className="pager"><button onClick={() => fetchSearch(pageToken)}>Next Page</button></div>}
 
-      {selected && (
+      {selectedVideo && (
         <div className="modal">
           <div className="modalInner">
-            <button className="closeBtn" onClick={()=>setSelected(null)}>Close</button>
+            <button className="closeBtn" onClick={() => setSelectedVideo(null)}>Close</button>
             <iframe
               width="900"
               height="506"
-              src={`https://www.youtube.com/embed/${selected}`}
+              src={`https://www.youtube.com/embed/${selectedVideo.id}`}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
-              title={selectedMeta?.snippet?.title || 'player'}
+              title={selectedVideo.snippet?.title || 'player'}
             />
-            <h3>{selectedMeta?.snippet?.title}</h3>
-            <a href={`https://www.youtube.com/watch?v=${selected}`} target="_blank" rel="noreferrer">Open on YouTube</a>
+            <h3>{selectedVideo.snippet?.title}</h3>
+            <p>{selectedVideo.snippet?.description?.slice(0, 300)}</p>
+            <a href={`https://www.youtube.com/watch?v=${selectedVideo.id}`} target="_blank" rel="noreferrer">Open on YouTube</a>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-export default App;
