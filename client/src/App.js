@@ -7,7 +7,7 @@ const API_BASE = process.env.REACT_APP_API_BASE || 'https://cg-songs.onrender.co
 
 // Replace these with the actual channel IDs you want (or leave blank)
 const AVAILABLE_CHANNELS = [
-  // Example: 'UCxxxxxxxxxxxxxxxxx1',
+  // Example: 'UC6wE1QldDPmYWwGyuudy3Tg',
   // 'UCxxxxxxxxxxxxxxxxx2'
 ];
 
