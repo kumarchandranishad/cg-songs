@@ -19,7 +19,7 @@ jobs:
       - name: Build client
         working-directory: ./client
         run: |
-          npm ci
+          npm install
           echo "REACT_APP_API_BASE=${{ secrets.REACT_APP_API_BASE }}" >> .env
           npm run build
 
