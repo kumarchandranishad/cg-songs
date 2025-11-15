@@ -53,7 +53,7 @@ const DEFAULT_MAX = 12;
 // Default allowed channels (replace with your channel IDs or pass via query)
 const DEFAULT_ALLOWED_CHANNELS = [
   // Example placeholders — replace with real channel IDs like "UCxxxxx..."
-  // "UCxxxxxxxxxxxxxxxxx1",
+  // "UC6wE1QldDPmYWwGyuudy3Tg",
   // "UCxxxxxxxxxxxxxxxxx2"
 ];
 
