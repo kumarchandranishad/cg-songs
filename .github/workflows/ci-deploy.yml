@@ -23,12 +23,20 @@ jobs:
           echo "REACT_APP_API_BASE=${{ secrets.REACT_APP_API_BASE }}" >> .env
           npm run build
 
+      - name: Show build folder (debug)
+        working-directory: ./client
+        run: |
+          echo "=== pwd ==="
+          pwd
+          echo "=== listing client/build ==="
+          ls -la build || true
+
       - name: Upload build to Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
           server: ${{ secrets.HOSTINGER_FTP_HOST }}
           username: ${{ secrets.HOSTINGER_FTP_USER }}
           password: ${{ secrets.HOSTINGER_FTP_PASS }}
-          local-dir: client/build
-          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          local-dir: client/build/                # <-- trailing slash REQUIRED
+          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}  # ensure secret ends with '/'
           protocol: ftp
